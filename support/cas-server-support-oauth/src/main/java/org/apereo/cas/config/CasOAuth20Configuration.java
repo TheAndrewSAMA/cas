@@ -16,6 +16,8 @@ import org.apereo.cas.authentication.principal.PrincipalFactoryUtils;
 import org.apereo.cas.authentication.principal.PrincipalResolver;
 import org.apereo.cas.authentication.principal.ServiceFactory;
 import org.apereo.cas.authentication.principal.WebApplicationService;
+import org.apereo.cas.authentication.surrogate.DefaultSurrogateCredentialParser;
+import org.apereo.cas.authentication.surrogate.SurrogateCredentialParser;
 import org.apereo.cas.configuration.CasConfigurationProperties;
 import org.apereo.cas.configuration.features.CasFeatureModule;
 import org.apereo.cas.configuration.model.support.replication.CookieSessionReplicationProperties;
@@ -588,7 +590,7 @@ class CasOAuth20Configuration {
             @Qualifier("userFormClient") final Client userFormClient,
             @Qualifier("accessTokenClient") final Client accessTokenClient,
             final ObjectProvider<List<OAuth20AuthenticationClientProvider>> providers) {
-            
+
             val clientProviders = Optional.ofNullable(providers.getIfAvailable()).orElseGet(ArrayList::new);
             AnnotationAwareOrderComparator.sort(clientProviders);
             val clientList = new ArrayList<Client>();
@@ -648,7 +650,7 @@ class CasOAuth20Configuration {
             @Qualifier("oauth20ConfigurationContext") final OAuth20ConfigurationContext context) {
             return new AccessTokenTokenExchangeGrantRequestExtractor(context);
         }
-        
+
         @Bean
         @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
         public AccessTokenGrantRequestExtractor accessTokenProofKeyCodeExchangeAuthorizationCodeGrantRequestExtractor(
@@ -1021,7 +1023,7 @@ class CasOAuth20Configuration {
                 .otherwiseProxy()
                 .get();
         }
-        
+
         @Bean
         @ConditionalOnMissingBean(name = "oauthPasswordGrantTypeTokenRequestValidator")
         @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
@@ -1391,6 +1393,13 @@ class CasOAuth20Configuration {
     @Configuration(value = "CasOAuth20AuthenticatorConfiguration", proxyBeanMethods = false)
     @EnableConfigurationProperties(CasConfigurationProperties.class)
     static class CasOAuth20AuthenticatorConfiguration {
+
+        @Bean
+        @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
+        @ConditionalOnMissingBean(name = "surrogateCredentialParser")
+        public SurrogateCredentialParser surrogateCredentialParser(final CasConfigurationProperties casProperties) {
+            return new DefaultSurrogateCredentialParser(casProperties.getAuthn().getSurrogate());
+        }
         @ConditionalOnMissingBean(name = "oauthCasAuthenticationBuilder")
         @Bean
         @RefreshScope(proxyMode = ScopedProxyMode.DEFAULT)
@@ -1493,7 +1502,8 @@ class CasOAuth20Configuration {
             @Qualifier(AuthenticationSystemSupport.BEAN_NAME) final AuthenticationSystemSupport authenticationSystemSupport,
             @Qualifier(ServicesManager.BEAN_NAME) final ServicesManager servicesManager,
             @Qualifier(OAuth20ClientSecretValidator.BEAN_NAME) final OAuth20ClientSecretValidator oauth20ClientSecretValidator,
-            @Qualifier(AuthenticationAttributeReleasePolicy.BEAN_NAME) final AuthenticationAttributeReleasePolicy authenticationAttributeReleasePolicy) {
+            @Qualifier(AuthenticationAttributeReleasePolicy.BEAN_NAME) final AuthenticationAttributeReleasePolicy authenticationAttributeReleasePolicy,
+            @Qualifier("surrogateCredentialParser") final SurrogateCredentialParser surrogateCredentialParser) {
             return new OAuth20UsernamePasswordAuthenticator(
                 authenticationSystemSupport,
                 servicesManager,
@@ -1502,7 +1512,9 @@ class CasOAuth20Configuration {
                 oauth20ClientSecretValidator,
                 authenticationAttributeReleasePolicy,
                 profileScopeToAttributesFilter,
-                ticketFactory, applicationContext);
+                ticketFactory, 
+                applicationContext,
+                surrogateCredentialParser);
         }
 
         @ConditionalOnMissingBean(name = "oauthAccessTokenAuthenticator")

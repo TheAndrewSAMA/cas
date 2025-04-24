@@ -6,6 +6,8 @@ import org.apereo.cas.authentication.credential.UsernamePasswordCredential;
 import org.apereo.cas.authentication.principal.Principal;
 import org.apereo.cas.authentication.principal.Service;
 import org.apereo.cas.authentication.principal.ServiceFactory;
+import org.apereo.cas.authentication.surrogate.SurrogateCredentialParser;
+import org.apereo.cas.authentication.surrogate.SurrogateCredentialTrait;
 import org.apereo.cas.services.RegisteredServiceAccessStrategyUtils;
 import org.apereo.cas.services.RegisteredServiceUsernameProviderContext;
 import org.apereo.cas.services.ServicesManager;
@@ -43,7 +45,6 @@ import java.util.Optional;
  * @since 5.0.0
  */
 @Slf4j
-@RequiredArgsConstructor
 public class OAuth20UsernamePasswordAuthenticator implements Authenticator {
     private final AuthenticationSystemSupport authenticationSystemSupport;
 
@@ -63,11 +64,66 @@ public class OAuth20UsernamePasswordAuthenticator implements Authenticator {
 
     private final ConfigurableApplicationContext applicationContext;
 
+    private final SurrogateCredentialParser surrogateCredentialParser;
+
+    public OAuth20UsernamePasswordAuthenticator(
+        final AuthenticationSystemSupport authenticationSystemSupport,
+        final ServicesManager servicesManager,
+        final ServiceFactory webApplicationServiceFactory,
+        final OAuth20RequestParameterResolver requestParameterResolver,
+        final OAuth20ClientSecretValidator clientSecretValidator,
+        final AuthenticationAttributeReleasePolicy authenticationAttributeReleasePolicy,
+        final OAuth20ProfileScopeToAttributesFilter profileScopeToAttributesFilter,
+        final TicketFactory ticketFactory,
+        final ConfigurableApplicationContext applicationContext) {
+        this(authenticationSystemSupport, servicesManager, webApplicationServiceFactory, 
+            requestParameterResolver, clientSecretValidator, authenticationAttributeReleasePolicy, 
+            profileScopeToAttributesFilter, ticketFactory, applicationContext, null);
+    }
+
+    public OAuth20UsernamePasswordAuthenticator(
+        final AuthenticationSystemSupport authenticationSystemSupport,
+        final ServicesManager servicesManager,
+        final ServiceFactory webApplicationServiceFactory,
+        final OAuth20RequestParameterResolver requestParameterResolver,
+        final OAuth20ClientSecretValidator clientSecretValidator,
+        final AuthenticationAttributeReleasePolicy authenticationAttributeReleasePolicy,
+        final OAuth20ProfileScopeToAttributesFilter profileScopeToAttributesFilter,
+        final TicketFactory ticketFactory,
+        final ConfigurableApplicationContext applicationContext,
+        final SurrogateCredentialParser surrogateCredentialParser) {
+        this.authenticationSystemSupport = authenticationSystemSupport;
+        this.servicesManager = servicesManager;
+        this.webApplicationServiceFactory = webApplicationServiceFactory;
+        this.requestParameterResolver = requestParameterResolver;
+        this.clientSecretValidator = clientSecretValidator;
+        this.authenticationAttributeReleasePolicy = authenticationAttributeReleasePolicy;
+        this.profileScopeToAttributesFilter = profileScopeToAttributesFilter;
+        this.ticketFactory = ticketFactory;
+        this.applicationContext = applicationContext;
+        this.surrogateCredentialParser = surrogateCredentialParser;
+    }
+
     @Override
     public Optional<Credentials> validate(final CallContext callContext, final Credentials credentials) throws CredentialsException {
         try {
             val upc = (UsernamePasswordCredentials) credentials;
             val casCredential = new UsernamePasswordCredential(upc.getUsername(), upc.getPassword());
+
+            // Process surrogate authentication if needed
+            if (surrogateCredentialParser != null) {
+                val surrogateRequest = surrogateCredentialParser.parse(casCredential);
+                surrogateRequest.ifPresent(payload -> {
+                    if (!payload.hasSurrogateUsername()) {
+                        casCredential.getCredentialMetadata().addTrait(
+                            new SurrogateCredentialTrait(payload.getSurrogateUsername()));
+                        casCredential.setId(payload.getUsername());
+                        LOGGER.debug("Converted credential to surrogate for username [{}] with surrogate [{}]", 
+                            payload.getUsername(), payload.getSurrogateUsername());
+                    }
+                });
+            }
+
             val clientIdAndSecret = requestParameterResolver.resolveClientIdAndClientSecret(callContext);
             if (StringUtils.isBlank(clientIdAndSecret.getKey())) {
                 throw new CredentialsException("No client credentials could be identified in this request");

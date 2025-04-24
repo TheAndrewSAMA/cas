@@ -5,7 +5,7 @@ dependencies {
     implementation libraries.nimbus
     implementation libraries.jose4j
     implementation libraries.pac4jcas
-    
+
     api project(":api:cas-server-core-api-throttle")
     api project(":api:cas-server-core-api")
 
@@ -33,6 +33,8 @@ dependencies {
     implementation project(":support:cas-server-support-oauth-core-api")
     implementation project(":support:cas-server-support-oauth-services")
     implementation project(":support:cas-server-support-pac4j-api")
+    implementation project(":support:cas-server-support-surrogate-api")
+    implementation project(":support:cas-server-support-surrogate-core")
 
     testImplementation libraries.springboottomcat
 
@@ -50,7 +52,7 @@ dependencies {
     testImplementation project(":core:cas-server-core-cookie")
     testImplementation project(":core:cas-server-core-webflow-mfa")
     testImplementation project(":core:cas-server-core-webflow")
-    
+
     testImplementation project(":support:cas-server-support-person-directory")
     testImplementation project(":support:cas-server-support-thymeleaf")
     testImplementation project(":support:cas-server-support-themes")
