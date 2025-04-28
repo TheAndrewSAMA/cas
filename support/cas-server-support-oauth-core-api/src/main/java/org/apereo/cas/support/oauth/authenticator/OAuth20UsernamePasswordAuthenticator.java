@@ -114,7 +114,7 @@ public class OAuth20UsernamePasswordAuthenticator implements Authenticator {
             if (surrogateCredentialParser != null) {
                 val surrogateRequest = surrogateCredentialParser.parse(casCredential);
                 surrogateRequest.ifPresent(payload -> {
-                    if (!payload.hasSurrogateUsername()) {
+                    if (payload.hasSurrogateUsername()) {
                         casCredential.getCredentialMetadata().addTrait(
                             new SurrogateCredentialTrait(payload.getSurrogateUsername()));
                         casCredential.setId(payload.getUsername());
